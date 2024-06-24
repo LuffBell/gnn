@@ -1,0 +1,11 @@
+data
+gnn_plots
+plots_gif
+**__pycache__
+wandb
+.bash_history
+.netrc
+.lesshst
+.dgl
+.config
+**.cache
