@@ -209,9 +209,9 @@ def shortest_path_computation(G):
 def collate_stress(samples):
     # The input `samples` is a list of pairs
     #  (graph, label).
-    graphs, sh_path, coup_idx = map(list, zip(*samples))
+    graphs, sh_path, coup_idx, filename = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.cat(sh_path), torch.cat(coup_idx),
+    return batched_graph, torch.cat(sh_path), torch.cat(coup_idx), filename
 
 
 ########## Rome_sequence_from_file
@@ -230,10 +230,8 @@ class Rome_from_file_dgl(Dataset):
     def __getitem__(self, idx):
         pathname = self.graphlist[idx]
         # print(f"Graph: {pathname}")
-        try:
-            g = nx.read_graphml(path=os.path.join(self.dataset_folder, pathname))
-        except:
-            print(pathname)
+        g = nx.read_graphml(path=os.path.join(self.dataset_folder, pathname))
+        filename = pathname
         nodenum = g.number_of_nodes()
         if nodenum < 10:
             print(pathname)
@@ -242,6 +240,8 @@ class Rome_from_file_dgl(Dataset):
         map_dict = {f"n{i}": i for i in range(nodenum)}
         g = nx.relabel_nodes(g, mapping=map_dict)
         g1 = dgl.from_networkx(g)
+
+        g1.filename = filename
 
         g1.set_n_initializer(dgl.init.zero_initializer)
         g1.set_e_initializer(dgl.init.zero_initializer)
@@ -282,10 +282,10 @@ class Rome_from_file_dgl(Dataset):
             pos = nx.nx_agraph.graphviz_layout(g)
         elif self.target_type == "stress":
             shortest_p, couples_indices = shortest_path_computation(g)
-            return g1, shortest_p, couples_indices
+            return g1, shortest_p, couples_indices, filename
         elif self.target_type == "void":
             pos = np.zeros((nodenum, 1))
-            return g1, torch.zeros((nodenum, 1), dtype=torch.float32)
+            return g1, torch.zeros((nodenum, 1), dtype=torch.float32), filename
         else:
             raise NotImplementedError
         # convert into numpy
@@ -300,7 +300,8 @@ class Rome_from_file_dgl(Dataset):
 
         # return g1, object1["pos"][:nodenum]
         # g1.labels = torch.tensor(object1["pos"])
-        return g1, torch.tensor(pos, dtype=torch.float32)
+        g1.graph['filename'] = filename
+        return g1, torch.tensor(pos, dtype=torch.float32), filename
 
 
 class Random_from_file_dgl(Dataset):
@@ -308,7 +309,6 @@ class Random_from_file_dgl(Dataset):
         self.dataset_folder = dataset_folder
         with open(os.path.join(dataset_folder, set), 'rb') as f:
             self.graphlist = pkl.load(f)
-            print(self.graphlist)
         self.encoding = encoding
         self.enc_digits = enc_digits
         self.target_type = target_type
@@ -321,6 +321,7 @@ class Random_from_file_dgl(Dataset):
         # print(f"Graph: {pathname}")
         with open('./data/random_graph/'+pathname, 'rb') as f:
             g = pkl.load(f)
+        filename = g.graph.get('filename', 'Filename not found')
         #g = nx.read_gpickle(path=os.path.join(self.dataset_folder, pathname))
         nodenum = g.number_of_nodes()
         if nodenum < 10:
@@ -332,6 +333,7 @@ class Random_from_file_dgl(Dataset):
         # g = nx.relabel_nodes(g, mapping=map_dict)
         g1 = dgl.from_networkx(g)
 
+        g1.filename = filename
         g1.set_n_initializer(dgl.init.zero_initializer)
         g1.set_e_initializer(dgl.init.zero_initializer)
 
@@ -367,7 +369,7 @@ class Random_from_file_dgl(Dataset):
             pos = nx.spectral_layout(g)
         elif self.target_type == "stress":
             shortest_p, couples_indices = shortest_path_computation(g)
-            return g1, shortest_p, couples_indices
+            return g1, shortest_p, couples_indices, filename
         else:
             raise NotImplementedError
         # convert into numpy
@@ -382,7 +384,10 @@ class Random_from_file_dgl(Dataset):
 
         # return g1, object1["pos"][:nodenum]
         # g1.labels = torch.tensor(object1["pos"])
-        return g1, torch.tensor(pos, dtype=torch.float32)
+
+        g1.graph['filename'] = filename
+
+        return g1, torch.tensor(pos, dtype=torch.float32), filename
 
 
 class Big_from_file_dgl(Dataset):

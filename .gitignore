@@ -9,3 +9,4 @@ wandb
 .dgl
 .config
 **.cache
+dgl-1.0.2

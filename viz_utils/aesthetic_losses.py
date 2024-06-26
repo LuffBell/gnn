@@ -96,6 +96,40 @@ class Stress_loss:
         return loss
 
 
+class CustomLoss(nn.Module):
+    def _init_(self, lambda_explainer=1.0, lambda_stress=1.0):
+        super(CustomLoss, self)._init_()
+        # self.base_loss_fn = base_loss_fn
+        self.lambda_explainer = lambda_explainer
+        self.lambda_stress = lambda_stress
+        self.pdist = nn.PairwiseDistance(p=2, eps=1e-16)
+        self.stress_loss_fn = StressCorrected().stress_loss
+
+    def forward(self, logits, targets, g):
+        # Perte de stress
+        stress_loss = self.stress_loss_fn(logits, targets)
+
+        # Perte d'explainer
+        node_masks = g.ndata['node_feat_mask']
+        explainer_loss = 0.0
+        for node_idx in range(g.number_of_nodes()):
+            node_mask = node_masks[node_idx]
+            important_nodes = torch.nonzero(node_mask > 0.5).squeeze()
+            if len(important_nodes) > 1:
+                for i in range(len(important_nodes)):
+                    for j in range(i + 1, len(important_nodes)):
+                        node_i = important_nodes[i]
+                        node_j = important_nodes[j]
+                        dist = self.pdist(logits[node_i].unsqueeze(0), logits[node_j].unsqueeze(0))
+                        explainer_loss += dist
+
+        explainer_loss /= g.number_of_nodes()
+
+        # Perte totale
+        total_loss = self.lambda_stress * stress_loss + self.lambda_explainer * explainer_loss
+        return total_loss
+    
+
 class StressCorrected:
     def __init__(self, ):
         self.loss_c = nn.MSELoss()

@@ -65,6 +65,7 @@ test_ratio = 0.10
 
 X_train, X_test = train_test_split(graph_files, test_size=1 - train_ratio)
 X_test, X_validate = train_test_split(X_test, test_size=test_ratio / (test_ratio + validation_ratio))
+# print(X_train)
 
 print(
     f"Len train: {len(X_train)}, len test: {len(X_test)}, len valid:{len(X_validate)}; total length: {len(X_train) + len(X_validate) + len(X_test)}")
@@ -75,3 +76,18 @@ with open(os.path.join(path_to_rome, "validation_list"), 'wb') as fp:
     pickle.dump(X_validate, fp)
 with open(os.path.join(path_to_rome, "test_list"), 'wb') as fp:
     pickle.dump(X_test, fp)
+
+
+with open(os.path.join(path_to_rome, "training_list.txt"), 'w') as fp:
+    for file in X_train:
+        print(file)
+        fp.write(f"{file}\n")
+    # pickle.dump(X_train, fp)
+with open(os.path.join(path_to_rome, "validation_list.txt"), 'w') as fp:
+    for file in X_validate:
+        fp.write(f"{file}\n")
+    # pickle.dump(X_validate, fp)
+with open(os.path.join(path_to_rome, "test_list.txt"), 'w') as fp:
+    for file in X_test:
+        fp.write(f"{file}\n")
+    # pickle.dump(X_test, fp)

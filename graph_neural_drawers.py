@@ -8,11 +8,11 @@ import matplotlib.pyplot as plt
 import wandb
 from dgl_gnn_models.models import GNN_factory, MLP
 from viz_utils.deepdraw_dataloder import criterion_procrustes
-from viz_utils.utils import collate_stress
+from viz_utils.utils_old import collate_stress
 from viz_utils.aesthetic_losses import Stress_loss, StressCorrected
-from viz_utils.utils import Random_from_file_dgl, Rome_from_file_dgl
-import viz_utils.utils
-from viz_utils.utils import collate_stress
+from viz_utils.utils_old import Random_from_file_dgl, Rome_from_file_dgl
+import viz_utils.utils_old
+from viz_utils.utils_old import collate_stress
 from copy import deepcopy
 from tqdm import tqdm
 from time import sleep
@@ -20,7 +20,7 @@ from time import sleep
 # GNN Explainer
 # from torch_geometric.explain import Explainer, GNNExplainer
 # BRUNO
-from torch_geometric.data import Data
+# from torch_geometric.data import Data
 
 from dgl.nn import AvgPooling, GNNExplainer
 from dgl.nn import GraphConv, SubgraphX
@@ -327,27 +327,27 @@ if __name__ == '__main__':
             
         # BRUNO
 
-        ## DGL SUBGRAPH EXPLAINER
-        explainer = SubgraphX(model, num_hops=1)
+        # ## DGL SUBGRAPH EXPLAINER
+        # explainer = SubgraphX(model, num_hops=1)
 
-        g, _, _ = graph_dataset[0]
-        features = g.ndata['feat']
+        # g, _, _ = graph_dataset[0]
+        # features = g.ndata['feat']
 
-        explanation = explainer.explain_graph(g.to(device), features.to(device), target_class = 1)
+        # explanation = explainer.explain_graph(g.to(device), features.to(device), target_class = 1)
 
-        print(explanation)
-        print(dir(explanation))
+        # print(explanation)
+        # print(dir(explanation))
 
         ## DGL EXPLAINER
-        explainer = GNNExplainer(model, num_hops=1)
+        # explainer = GNNExplainer(model, num_hops=1)
 
-        g, _, _ = graph_dataset[0]
-        features = g.ndata['feat']
+        # g, _, _ = graph_dataset[0]
+        # features = g.ndata['feat']
 
-        explanation = explainer.explain_graph(g.to(device), features.to(device))
+        # explanation = explainer.explain_graph(g.to(device), features.to(device))
 
-        print(explanation)
-        print(dir(explanation))
+        # print(explanation)
+        # print(dir(explanation))
 
         ######################################################
 
