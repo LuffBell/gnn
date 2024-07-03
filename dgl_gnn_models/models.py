@@ -136,7 +136,12 @@ class GAT(nn.Module):
             num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, negative_slope, residual, None))
 
-    def forward(self, g, inputs):
+    def forward(self, g = None, inputs = None, *args, **kwargs):
+        if "graph" in kwargs.keys():
+            g = kwargs.get("graph")
+        if "feat" in kwargs.keys():
+            inputs = kwargs.get("feat")
+            
         h = inputs
         for l in range(self.num_layers):
             h = self.gat_layers[l](g, h).flatten(1)

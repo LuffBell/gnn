@@ -163,8 +163,8 @@ if __name__ == '__main__':
     show = "wandb" if args.wandb else "disk"
     # wandb init
     if args.wandb:
-        WANDB_PROJ = "gnd"
-        WANDB_ENTITY = "test"
+        WANDB_PROJ = "test"
+        WANDB_ENTITY = "brunoufpe"
         wandb.init(project=WANDB_PROJ, entity=WANDB_ENTITY, config=exp_config)
 
     plot_dir = "gnn_plots"
@@ -442,7 +442,7 @@ if __name__ == '__main__':
                     wandb.log({"best_epoch": epoch, "best_valid_loss": best_acc_val}, step=epoch)
                 if args.save_model:
                     best_model_state = deepcopy(model.state_dict())
-                    torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}100.pth"))
+                    torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}.pth"))
 
             else:
                 patience_counter += 1
@@ -494,4 +494,4 @@ if __name__ == '__main__':
 
     # saving the model
     if args.save_model:
-        torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}100.pth"))
+        torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}.pth"))

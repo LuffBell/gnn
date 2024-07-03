@@ -84,7 +84,7 @@ def forward_plot(g, model, retina_dims, epoch, show="disk", plot_dir="gnn_plots"
     if show == "screen":
         plt.show()
     elif show == "disk":
-        plt.savefig(os.path.join(plot_dir, f'{name}_{epoch}_n.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(plot_dir, f'{name}_{epoch}_new.png'), bbox_inches='tight')
         # print(dict_positions)
         plt.close()
     elif show == "wandb":
@@ -207,8 +207,8 @@ if __name__ == '__main__':
     show = "wandb" if args.wandb else "disk"
     # wandb init
     if args.wandb:
-        WANDB_PROJ = "gnd"
-        WANDB_ENTITY = "test"
+        WANDB_PROJ = "test"
+        WANDB_ENTITY = "brunoufpe"
         wandb.init(project=WANDB_PROJ, entity=WANDB_ENTITY, config=exp_config)
 
     plot_dir = "gnn_plots"
@@ -274,7 +274,7 @@ if __name__ == '__main__':
                     drop_rate=args.drop).to(device)
     else:
         model = GNN_factory.createModel(name=args.gnn_model, config=exp_config).to(device)
-
+    
     if add_aesthete != "false" and args.target_type == "stress":  # crossing edge only in stress mode
         import torch.nn as nn
 
@@ -313,8 +313,8 @@ if __name__ == '__main__':
         loss_c = StressCorrected()
         loss_comp = loss_c.stress_loss
     elif args.loss_f == "custom":
-
-        loss_comp = CustomLoss().forward
+        loss_c = CustomLoss(model)
+        loss_comp = loss_c.forward
     else:
         raise NotImplementedError
 
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     patience_counter = 0
 
     best_model_state = deepcopy(model.state_dict())
-
+    
     if args.save_model:
         torch.save(best_model_state, os.path.join(save_dir, "start_model.pth"))
 
@@ -373,42 +373,6 @@ if __name__ == '__main__':
 
             plt.close('all')
 
-
-            
-        # BRUNO
-
-        ## DGL SUBGRAPH EXPLAINER
-        # explainer = SubgraphX(model, num_hops=1)
-
-        # g, _, _, _ = graph_dataset[0]
-        # features = g.ndata['feat']
-
-        # explanation = explainer.explain_graph(g.to(device), features.to(device), target_class = 1)
-
-        # print(explanation)
-        # print(dir(explanation))
-
-        # ## DGL EXPLAINER
-        # model_wrap = ModelWrapper(model)
-
-
-
-        # explainer = GNNExplainer(model_wrap, num_hops=1)
-
-        # g, _, _, _ = graph_dataset[0]
-        # features = g.ndata['feat']
-
-        # explanation = explainer.explain_graph(graph = g.to(device), features = features.to(device), feat = features.to(device))
-
-        # #explainer.explain_node(node_id=node_id,graph=graph, features=graph.ndata["feat"], feat =graph.ndata["feat"])
-
-            
-
-        # print(explanation)
-        # print(dir(explanation))
-
-        ######################################################
-
         model.train()
 
         counter = 0
@@ -419,6 +383,7 @@ if __name__ == '__main__':
         with tqdm(dataloader, unit="batch") as tepoch:
 ###NATHAN
             for all in tepoch:
+                print(tepoch)
                 tepoch.set_description(f"Training Epoch {epoch}")
                 if args.target_type == "stress":
                     g, short_p, couple_idx, filename = all
@@ -430,15 +395,18 @@ if __name__ == '__main__':
                     g, targets = g.to(device), targets.to(device)
                 logits = model(g, g.ndata["feat"])
 
-                # print(read_json_and_get_info(json_file_path, filename[0])['feat_mask'])
+                # important_nods = read_json_and_get_info(json_file_path, filename[0])['feat_mask']
 ###NATHAN
                 # compute loss
                 if add_aesthete == "false":
-                    loss = loss_comp(logits, targets)
+                    loss = loss_comp(logits, targets, g)
                 elif args.target_type == "stress" and add_aesthete == "cross":
                     loss = neural_drawer.cross_loss(logits, g.edges())
                 elif args.target_type == "stress" and add_aesthete == "combined":
-                    loss = loss_comp(logits, targets) + args.weight_l * neural_drawer.cross_loss(logits, g.edges())
+                    # print(loss_c.stress_loss_fn)
+                    loss, silhouette_score, pairwise_distance_reduction, intra_cluster_distance, inter_cluster_distance = loss_comp(logits, targets, g, epoch, 'train')
+                    loss = loss + args.weight_l * neural_drawer.cross_loss(logits, g.edges())
+
                 batch_train_loss += loss
                 global_train_loss += loss
                 # hack to obtain batched loss computation
@@ -458,6 +426,10 @@ if __name__ == '__main__':
         if args.wandb:
             # where the magic happens
             wandb.log({"epoch": epoch, "train_loss": epoch_train_loss}, step=epoch)
+            wandb.log({"epoch": epoch, "train_silhouette_score": silhouette_score}, step=epoch)
+            wandb.log({"epoch": epoch, "train_pairwise_distance_reduction": pairwise_distance_reduction}, step=epoch)
+            wandb.log({"epoch": epoch, "train_intra_cluster_distance": intra_cluster_distance}, step=epoch)
+            wandb.log({"epoch": epoch, "train_inter_cluster_distance": inter_cluster_distance}, step=epoch)
 
         val_loss = 0.0
         model.eval()
@@ -475,21 +447,15 @@ if __name__ == '__main__':
                         g_val, targets_val, filename = all_val
                         g_val, targets_val = g_val.to(device), targets_val.to(device)
 
-
-
-                    print("################")
-                    # print(read_json_and_get_info(json_file_path, filename[0])['feat_mask'])
-                    print("################")
-
                     logits_val = model(g_val, g_val.ndata["feat"])
 
                     if add_aesthete == "false":
-                        loss = loss_comp(logits_val, targets_val)
+                        loss = loss_comp(logits_val, targets_val, g_val)
                     elif args.target_type == "stress" and add_aesthete == "cross":
                         loss = neural_drawer.cross_loss(logits_val, g_val.edges())
                     elif args.target_type == "stress" and add_aesthete == "combined":
-                        loss = loss_comp(logits_val, targets_val) + args.weight_l * neural_drawer.cross_loss(logits_val,
-                                                                                                             g_val.edges())
+                        loss, silhouette_score, pairwise_distance_reduction, intra_cluster_distance, inter_cluster_distance = loss_comp(logits_val, targets_val, g_val, epoch, 'val')
+                        loss = loss + args.weight_l * neural_drawer.cross_loss(logits_val, g_val.edges())
 
                     val_loss += loss
                     sleep(0.01)
@@ -508,7 +474,7 @@ if __name__ == '__main__':
                     wandb.log({"best_epoch": epoch, "best_valid_loss": best_acc_val}, step=epoch)
                 if args.save_model:
                     best_model_state = deepcopy(model.state_dict())
-                    torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}100.pth"))
+                    torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}_new.pth"))
 
             else:
                 patience_counter += 1
@@ -519,6 +485,10 @@ if __name__ == '__main__':
             if args.wandb:
                 # where the magic happens
                 wandb.log({"epoch": epoch, "valid_loss": epoch_valid_loss}, step=epoch)
+                wandb.log({"epoch": epoch, "valid_silhouette_score": silhouette_score}, step=epoch)
+                wandb.log({"epoch": epoch, "valid_pairwise_distance_reduction": pairwise_distance_reduction}, step=epoch)
+                wandb.log({"epoch": epoch, "valid_intra_cluster_distance": intra_cluster_distance}, step=epoch)
+                wandb.log({"epoch": epoch, "valid_inter_cluster_distance": inter_cluster_distance}, step=epoch)
 ###NATHAN
             test_loss = 0.0
             model.eval()
@@ -542,12 +512,15 @@ if __name__ == '__main__':
                     logits_test = model(g_test, g_test.ndata["feat"])
 
                     if add_aesthete == "false":
-                        loss = loss_comp(logits_test, targets_test)
+                        loss = loss_comp(logits_test, targets_test, g_test)
                     elif args.target_type == "stress" and add_aesthete == "cross":
                         loss = neural_drawer.cross_loss(logits_test, g_test.edges())
                     elif args.target_type == "stress" and add_aesthete == "combined":
-                        loss = loss_comp(logits_test, targets_test) + args.weight_l * neural_drawer.cross_loss(
-                            logits_test, g_test.edges())
+                        loss, silhouette_score, pairwise_distance_reduction, intra_cluster_distance, inter_cluster_distance = loss_comp(logits_test, targets_test, g_test, epoch, 'test')
+                        loss = loss + args.weight_l * neural_drawer.cross_loss(
+                            logits_test
+                            , g_test.edges()
+                        )
 
                     test_loss += loss
 
@@ -559,9 +532,14 @@ if __name__ == '__main__':
             if args.wandb:
                 # where the magic happens
                 wandb.log({"epoch": epoch, "test_loss": epoch_test_loss}, step=epoch)
+                wandb.log({"epoch": epoch, "test_silhouette_score": silhouette_score}, step=epoch)
+                wandb.log({"epoch": epoch, "test_pairwise_distance_reduction": pairwise_distance_reduction}, step=epoch)
+                wandb.log({"epoch": epoch, "test_intra_cluster_distance": intra_cluster_distance}, step=epoch)
+                wandb.log({"epoch": epoch, "test_inter_cluster_distance": inter_cluster_distance}, step=epoch)
+
                 if patience_counter == 0:
                     wandb.log({"epoch": epoch, "best_test_loss": epoch_test_loss}, step=epoch)
 
     # saving the model
     if args.save_model:
-        torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}100.pth"))
+        torch.save(best_model_state, os.path.join(save_dir, f"model_{args.gnn_model}_new.pth"))
